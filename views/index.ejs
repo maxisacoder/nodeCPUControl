@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+
+  <style>
+    body {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      text-align: center;
+    }
+
+    .header
+    {
+      text-align: center;
+    }
+
+    .increaseBtn{
+      height: 200px;
+      width: 350px;
+      float: left;
+    }
+
+    .decreaseBtn{
+      height: 200px;
+      width: 350px;
+      float: right;
+    }
+
+    .graph{
+      display: inline-block;
+    }
+
+    .graph .axis {
+      stroke-width: 1;
+    }
+    .graph .axis .tick line {
+      stroke: black;
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+
+
+    .graph .axis .tick text {
+      fill: black;
+      font-size: 0.7em;
+    }
+
+    .graph .axis .domain {
+      fill: none;
+      stroke: black;
+    }
+
+    .graph .group {
+      fill: none;
+      stroke: black;
+      stroke-width: 1.5;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class = 'header'>
+  <h1> Control Penal of the Docker Container CPU Utilization</h1>
+</div>
+
+<div class="graph"></div>
+
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script>
+  var limit = 60 * 1,
+          duration = 750,
+          now = new Date(Date.now() - duration)
+
+  var margin = {top: 20, right: 20, bottom: 20, left: 40},
+          width = 960 - margin.left - margin.right,
+          height = 500 - margin.top - margin.bottom;
+
+  var groups = {
+    sys: {
+      value: 0,
+      color: 'green',
+      data: d3.range(limit).map(function() {
+        return 0
+      })
+    }
+    ,
+    usr: {
+      value: 0,
+      color: 'blue',
+      data: d3.range(limit).map(function() {
+        return 0
+      })
+    }
+// ,
+//    output: {
+//      value: 0,
+//      color: 'grey',
+//      data: d3.range(limit).map(function() {
+//        return 0
+//      })
+//    }
+  }
+
+  var x = d3.time.scale()
+          .domain([now - (limit - 2), now - duration])
+          .range([0, width])
+
+  var y = d3.scale.linear()
+          .domain([0, 100])
+          .range([height, 0])
+
+  var line = d3.svg.line()
+          .interpolate('basis')
+          .x(function(d, i) {
+            return x(now - (limit - 1 - i) * duration)
+          })
+          .y(function(d) {
+            return y(d)+margin.top
+          })
+
+  var svg = d3.select('.graph').append('svg')
+          .attr('class', 'chart')
+          .attr('width', width + margin.left + margin.right )
+          .attr('height', height + margin.top + margin.bottom)
+
+  var axis_x = svg.append('g')
+          .attr('class', 'x axis')
+          .attr('transform', 'translate('+margin.left+ "," + (height + margin.top) + ')')
+          .call(x.axis = d3.svg.axis().scale(x).orient('bottom'));
+
+
+  var axis_y = svg.append("g")
+          .attr("class", "y axis")
+          .attr("transform", "translate("+margin.left+","+margin.top+")")
+          .call(y.axis = d3.svg.axis().scale(y).orient("left"))
+//          .append("text")
+//          .attr("transform", "rotate(-90)")
+////          .attr("y", 20)
+////          .attr("dy", ".71em")
+//          .style("text-anchor", "end")
+//          .text("Utilization Rate(%)");
+
+//  var axis_y = d3.svg.axis()
+//            .scale(y)
+//            .orient('left')
+//            .ticks(10,"%");
+
+  var paths = svg.append('g')
+              .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+  for (var name in groups) {
+    var group = groups[name]
+    group.path = paths.append('path')
+            .data([group.data])
+            .attr('class', name + ' group')
+            .style('stroke', group.color)
+  }
+
+  var cnt = 0;
+  var pre_data = {'sys':0,'usr':0} //store the previous tick data
+  function tick(data) {
+    now = new Date()
+    var usage = {};
+
+    // synchronously get one data
+    var ajax = new XMLHttpRequest();
+    ajax.open('GET','/checkDocker',false);
+    ajax.send(null);
+    if (ajax.status === 200) {
+      usage = JSON.parse( ajax.responseText );
+    }
+
+    // Add new values
+    for (var name in groups) {
+//      console.log(name);
+      var group = groups[name]
+      //group.data.push(group.value) // Real values arrive at irregular intervals
+      console.log(name+usage[name]);
+
+      var floatData =  parseFloat(usage[name])
+      if(floatData)
+      {
+        group.data.push(floatData)
+        group.path.attr('d', line)
+        pre_data[name] = floatData;
+      }
+      else
+      {
+        group.data.push(pre_data[name])
+        group.path.attr('d', line)
+      }
+
+    }
+
+    // Shift domain
+    x.domain([now - (limit - 2) * duration, now - duration])
+
+    // Slide x-axis left
+    axis_x.transition()
+            .duration(duration)
+            .ease('linear')
+            .call(x.axis)
+
+    // Slide paths left
+    paths.attr('transform', null)
+            .transition()
+            .duration(duration)
+            .ease('linear')
+            .attr('transform', 'translate(' + x(now - (limit - 1) * duration) + ')')
+            .each('end', tick)
+
+    // Remove oldest data point from each group
+    for (var name in groups) {
+      var group = groups[name]
+      group.data.shift()
+    }
+    console.log(cnt++ + '\n');
+  }
+
+  tick()
+</script>
+
+<div class='increaseBtn' onmousedown="mDown(this)" onmouseup="mUp(this)"
+     style="background-color:#252680;color:#ffffff;width:90px;height:20px;padding:40px;font-size:12px;">
+     增加单位CPU负载
+</div>
+
+<script>
+  function mDown(obj)
+  {
+    obj.style.backgroundColor="blue";
+    obj.innerHTML="1个stress workers spinning"
+  }
+
+  function mUp(obj)
+  {
+    obj.style.backgroundColor="green";
+    obj.innerHTML="增加单位CPU负载"
+    // synchronously get one data
+    var ajax_add = new XMLHttpRequest();
+    ajax_add.open('GET','/add',true);
+    ajax_add.send(null);
+  }
+</script>
+
+
+<div class = 'decreaseBtn' onmousedown="mDown(this)" onmouseup="mUp(this)"
+     style="background-color:#252680;color:#ffffff;width:90px;height:20px;padding:40px;font-size:12px;">
+  减少单位CPU负载
+</div>
+
+
+
+</body>
+</html>

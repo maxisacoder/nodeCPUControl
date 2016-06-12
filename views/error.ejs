@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+    svg {
+        font: 10px sans-serif;
+    }
+    .axis path,
+    .axis line {
+        fill: none;
+        stroke: black;
+        shape-rendering: crispEdges;
+    }
+    .axis text {
+        font-family: sans-serif;
+        font-size: 11px;
+    }
+</style>
+<body>
+</body>
+
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script>
+    var xScale = d3.scale.linear()
+            .domain([0,100])
+            .range([0,500]);
+
+    var xAxis = d3.svg.axis()
+            .scale(xScale)
+            .orient("left");
+
+    var svg = d3.select('body').append('svg')
+            .attr('class', 'chart')
+            .attr('width', 960)
+            .attr('height',500)
+
+    svg.append('g')
+            .attr("class", 'x axis')
+            .attr('transform',"translate(0,0)")
+            .call(xAxis);
+
+</script>
+
+</html>
